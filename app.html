@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আন নাজাত ইসলামি সমাজ কল্যাণ পরিষদ | Donation Portal</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Baloo+Da+2:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      /* Ensure the React app takes up the whole screen and apply professional font */
+      body {
+        font-family: 'Roboto', sans-serif;
+      }
+      /* Bengali text font preference */
+      .bengali {
+        font-family: 'Baloo Da 2', sans-serif;
+      }
+      #root {
+        min-height: 100vh;
+      }
+      /* Styles for printing (receipt functionality) */
+      @media print {
+        header, footer, button, .no-print, .mt-6 > button:not(:first-child) { display: none !important; }
+        .bg-gray-50, .bg-white, .shadow, .p-6, .py-4 { background-color: white !important; box-shadow: none !important; padding: 0 !important; }
+        .receipt-container { padding: 20px !important; margin: 0 auto !important; max-width: 600px !important; border: 1px solid #ccc; }
+      }
+      /* Custom gradient for the organization name - Updated for light background contrast */
+      .org-name-gradient {
+        /* Logo color: #1982C4 */
+        background-image: linear-gradient(to right, #333333, #1982C4); /* Dark Gray to Blue */
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        color: transparent; /* Fallback for browsers not supporting background-clip: text */
+      }
+      /* Custom gradient for Dark Mode Logo text */
+      .dark .org-name-gradient {
+         background-image: linear-gradient(to right, #f1faee, #1982C4); /* Light Menu BG to Blue */
+      }
+      
+      /* Hero background with subtle texture - Uses the main action green #7BE0AD */
+      .hero-background {
+        background-color: #7BE0AD; /* Main Action Green */
+        background-image: radial-gradient(circle at 50% 120%, rgba(255,255,255,.2), rgba(0,0,0,0));
+      }
+    </style>
+
+    <script>
+      // Configure TailwindCSS with the Pink/Green/Cream palette
+      tailwind.config = {
+        darkMode: 'class', // Enable dark mode using the 'dark' class on the HTML tag
+        theme: {
+          extend: {
+            colors: {
+              // Primary (Deep Pink/Maroon) - Used for Dark BG, Main Text, Dark Accents
+              primary: {
+                DEFAULT: '#DB2777', // Pink-600
+                50: '#FDF2F8',      // Pink-50 (Used for soft backgrounds, representing Cream)
+                100: '#FBCFE8',
+                500: '#EC4899', // Pink-500
+                700: '#BE185D', // Pink-700
+                900: '#831843', // Pink-900 (For Header/Footer BG)
+              },
+              // Action (New Green) - Used for Buttons, Links, Highlights
+              action: {
+                DEFAULT: '#7BE0AD', // Main Action Green (Vibrant)
+                light: '#E6FFF2',   // Very light version 
+                dark: '#48B07E',    // Darker version 
+              }
+            }
+          }
+        }
+      }
+    </script>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        /*
+        DonationApp - আন নাজাত ইসলামি সমাজ কল্যাণ পরিষদ
+        Professionalized Single-file React component.
+        */
+
+        function DonationApp() {
+          // organisation info (customize)
+          const org = {
+            name: "আন নাজাত ইসলামি সমাজ কল্যাণ পরিষদ",
+            location: "লাকেশ্বর বাজার",
+            tagline: "সেবা • সততা • সহযোগিতা • ইসলামি মূল্যবোধ",
+          };
+
+          // Dark Mode State and Logic
+          const [isDarkMode, setIsDarkMode] = React.useState(
+              localStorage.getItem('theme') === 'dark' || 
+              (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          );
+          const toggleDarkMode = () => setIsDarkMode(prev => !prev);
+          
+          React.useEffect(() => {
+              const root = window.document.documentElement;
+              if (isDarkMode) {
+                  root.classList.add('dark');
+                  localStorage.setItem('theme', 'dark');
+              } else {
+                  root.classList.remove('dark');
+                  localStorage.setItem('theme', 'light');
+              }
+          }, [isDarkMode]);
+          
+          // form state
+          const [amountPreset, setAmountPreset] = React.useState(500);
+          const [customAmount, setCustomAmount] = React.useState("");
+          const [name, setName] = React.useState("");
+          const [email, setEmail] = React.useState("");
+          const [phone, setPhone] = React.useState("");
+          const [anonymous, setAnonymous] = React.useState(false);
+          const [note, setNote] = React.useState("");
+          const [processing, setProcessing] = React.useState(false);
+          const [success, setSuccess] = React.useState(null);
+          const [donations, setDonations] = React.useState([]);
+          
+          // Updated view state: 'account' replaces 'register'
+          const [view, setView] = React.useState("home"); // home | donate | admin | about | account
+          
+          const [adminAuth, setAdminAuth] = React.useState(false);
+          const [adminPassword, setAdminPassword] = React.useState("");
+
+          // Account Management States
+          const [isLoginMode, setIsLoginMode] = React.useState(false); // Controls if account view shows login or registration form
+          const [isLoggedIn, setIsLoggedIn] = React.useState(false); // Tracks user login status
+          const [demoUser, setDemoUser] = React.useState(null); // Stores registered user for demo login
+
+          const [regName, setRegName] = React.useState("");
+          const [regEmail, setRegEmail] = React.useState("");
+          const [regPassword, setRegPassword] = React.useState("");
+          
+          const [loginEmail, setLoginEmail] = React.useState("");
+          const [loginPassword, setLoginPassword] = React.useState("");
+
+          const [regSuccess, setRegSuccess] = React.useState(false);
+
+          const receiptRef = React.useRef();
+
+          // load donations from localStorage
+          React.useEffect(() => {
+            const raw = localStorage.getItem("donations_an_najat");
+            if (raw) setDonations(JSON.parse(raw));
+          }, []);
+
+          React.useEffect(() => {
+            localStorage.setItem("donations_an_najat", JSON.stringify(donations));
+          }, [donations]);
+
+          const selectedAmount = () => {
+            const c = parseFloat(customAmount);
+            if (!isNaN(c) && c > 0) return c;
+            return amountPreset;
+          };
+
+          function validateForm() {
+            if (!anonymous) {
+              if (!name.trim()) return "Please enter donor's name or choose anonymous.";
+              if (!phone.trim()) return "Please enter a contact phone number.";
+            }
+            const amt = selectedAmount();
+            if (!amt || amt <= 0) return "Please enter a valid donation amount.";
+            return null;
+          }
+
+          function handleDonate(e) {
+            e.preventDefault();
+            const err = validateForm();
+            if (err) {
+              alert(err);
+              return;
+            }
+            setProcessing(true);
+            // Simulate payment processing
+            setTimeout(() => {
+              const donation = {
+                id: Date.now(),
+                name: anonymous ? "Anonymous" : name.trim(),
+                email: email.trim(),
+                phone: phone.trim(),
+                amount: selectedAmount(),
+                note: note.trim(),
+                date: new Date().toISOString(),
+                status: "Completed",
+              };
+              const updated = [donation, ...donations];
+              setDonations(updated);
+              setSuccess(donation);
+              setName("");
+              setEmail("");
+              setPhone("");
+              setNote("");
+              setCustomAmount("");
+              setAmountPreset(500);
+              setAnonymous(false);
+              setProcessing(false);
+              setView("receipt");
+            }, 1200);
+          }
+          
+          function handleRegister(e) {
+            e.preventDefault();
+            if (!regName.trim() || !regEmail.trim() || regPassword.length < 6) {
+              alert("Please enter a name, a valid email, and a password of at least 6 characters.");
+              return;
+            }
+            // Simulate API call
+            setProcessing(true);
+            setTimeout(() => {
+              // Store user data for demo login validation
+              setDemoUser({
+                  name: regName.trim(),
+                  email: regEmail.trim(),
+                  password: regPassword // In a real app, this would be hashed!
+              });
+              
+              setRegSuccess(true);
+              setIsLoginMode(true); // Switch to the login view
+              setLoginEmail(regEmail.trim()); // Pre-fill login email
+              
+              setProcessing(false);
+              setRegName(""); // Clear registration name field
+              setRegPassword(""); // Clear registration password field
+              setRegEmail(""); // Clear registration email field
+            }, 1000);
+          }
+          
+          function handleLogin(e) {
+            e.preventDefault();
+            setProcessing(true);
+
+            // Simulate login validation
+            setTimeout(() => {
+                if (demoUser && loginEmail === demoUser.email && loginPassword === demoUser.password) {
+                    setIsLoggedIn(true);
+                    setProcessing(false);
+                    // Redirect to home/dashboard
+                    alert(`Welcome back, ${demoUser.name}! You are now logged in.`);
+                    setView('home'); 
+                    setLoginEmail('');
+                    setLoginPassword('');
+                } else {
+                    setProcessing(false);
+                    alert("Login failed: Incorrect email or password. (Hint: Use the credentials you just registered with)");
+                }
+            }, 1000);
+          }
+        
+        function handleLogout() {
+            setIsLoggedIn(false);
+            // setDemoUser(null); // Keep demo user for re-login
+            setView('home');
+            alert("You have been successfully logged out.");
+        }
+
+
+          function exportCSV() {
+            const header = ["ID", "Name", "Email", "Phone", "Amount", "Note", "Date", "Status"];
+            const rows = donations.map(d => [d.id, d.name, d.email, d.phone, d.amount, (d.note || ""), d.date, d.status]);
+            const csv = [header, ...rows].map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "donations_an_najat.csv";
+            link.click();
+          }
+
+          function handleAdminLogin(e) {
+            e.preventDefault();
+            if (adminPassword === "admin123") {
+              setAdminAuth(true);
+              setView("admin");
+            } else {
+              alert("Incorrect admin password.");
+            }
+            setAdminPassword("");
+          }
+
+          function printReceipt() {
+            window.print();
+          }
+
+          // --- Nav Button Component for professional menu bar ---
+          const NavButton = ({ targetView, currentView, text, isPrimary = false, iconClass }) => (
+            <button 
+              onClick={() => setView(targetView)} 
+              className={`px-2 sm:px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105 shrink-0 
+                ${isPrimary 
+                  ? 'bg-action text-primary-900 hover:bg-action-dark hover:text-white shadow-lg dark:text-gray-900' 
+                  : currentView === targetView 
+                    ? 'bg-action-light text-primary-900 font-bold shadow-inner dark:bg-action-dark/50 dark:text-gray-900' 
+                    : 'text-primary-900 hover:bg-action-dark hover:text-white dark:text-action-light dark:hover:bg-action-dark/80 dark:hover:text-white'
+                }`}
+            >
+              {iconClass && <i className={`${iconClass} mr-0 sm:mr-2`}></i>}
+              {/* Show only first word on mobile, full text on larger screens */}
+              <span className="hidden sm:inline">{text}</span>
+              <span className="inline sm:hidden">{text.split(' ')[0]}</span> 
+            </button>
+          );
+
+          return (
+            <div className="min-h-screen bg-primary-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-500">
+              
+              {/* HEADER/MENU BAR DECORATION - Vertical padding changed to py-1 */}
+              <header className="bg-[#F1FAEE] shadow-2xl no-print sticky top-0 z-10 border-b-4 border-action dark:bg-gray-800 transition-colors duration-500">
+                {/* Vertical padding changed to py-1 */}
+                <div className="max-w-7xl mx-auto px-2 sm:px-4 py-1 flex items-center justify-between">
+                  <div className="text-center sm:text-left">
+                    {/* Logo text size reduced to text-sm sm:text-base */}
+                    <h1 className="text-sm sm:text-base font-bold tracking-wider bengali org-name-gradient shrink-0">
+                          {org.name}
+                      </h1>
+                  </div>
+                  
+                  {/* Dark Mode Toggle Button - Reduced padding to p-1 and size to text-lg */}
+                  <button 
+                      onClick={toggleDarkMode} 
+                      aria-label="Toggle Dark/Light Mode"
+                      className="p-1 ml-2 sm:ml-4 rounded-full text-lg text-primary-900 bg-action-light dark:bg-gray-700 dark:text-action hover:bg-action/50 dark:hover:bg-gray-600 transition-colors duration-200 shrink-0"
+                  >
+                      <i className={isDarkMode ? 'fas fa-sun' : 'fas fa-moon'}></i>
+                  </button>
+
+                  {/* Nav Bar - Space between buttons slightly adjusted to space-x-1 */}
+                  <nav className="space-x-1 sm:space-x-2 flex items-center">
+                    <NavButton targetView="home" currentView={view} text="Home" iconClass="fas fa-home" />
+                    <NavButton targetView="about" currentView={view} text="About Us" iconClass="fas fa-info-circle" />
+                    {/* Updated Nav Button: text and icon change based on login status */}
+                    <NavButton 
+                        targetView="account" 
+                        currentView={view} 
+                        text={isLoggedIn ? `Hello, ${demoUser?.name.split(' ')[0]}` : "Account"} 
+                        iconClass={isLoggedIn ? "fas fa-user-check" : "fas fa-user-plus"} 
+                    />
+                    <NavButton targetView="admin-login" currentView={view} text="Admin" iconClass="fas fa-user-shield" />
+                    <NavButton targetView="donate" currentView={view} text="Donate Now" isPrimary={true} iconClass="fas fa-heart" />
+                  </nav>
+                </div>
+              </header>
+
+              <main className="max-w-6xl mx-auto p-4 pt-0"> 
+                
+                {/* HOME VIEW REDESIGN (Inspired by Lawn Care Image) */}
+                {view === 'home' && (
+                  <section className="space-y-10">
+                    
+                    {/* Hero Section - Main Action Green BG, Cream/Pink Text */}
+                    <div className="hero-background w-full h-[50vh] flex flex-col justify-center items-center text-center p-12 rounded-none shadow-2xl overflow-hidden transform hover:scale-[1.005] transition-transform duration-500">
+                        <div className="relative z-10 max-w-4xl mx-auto">
+                            
+                            {/* Organization Name (Cream Text) */}
+                            <h2 className="text-5xl md:text-6xl font-extrabold mb-4 bengali text-primary-50">
+                                {org.name}
+                            </h2>
+                            
+                            {/* Tagline / Mission Statement (Cream Text) */}
+                            <p className="text-xl md:text-2xl font-light mb-8 text-primary-50 italic">
+                                "{org.tagline} — Empowering our community through service, integrity, and Islamic values."
+                            </p>
+                            
+                            {/* Action Button (Pink BG - similar to Red button in image) */}
+                            <button onClick={() => setView('donate')} className="inline-block px-10 py-4 bg-primary-700 text-white rounded-lg font-bold text-xl hover:bg-primary-900 transition-all duration-300 transform hover:scale-105 shadow-2xl border-2 border-white">
+                                <i className="fas fa-hand-holding-usd mr-3"></i> GIVE DONATION NOW
+                            </button>
+                        </div>
+                    </div>
+
+                    <h3 className="text-3xl font-bold text-center text-primary-700 pt-6 border-t border-primary-200 dark:text-primary-500 dark:border-gray-700">Our Pillars of Service</h3>
+
+                    {/* Content Section below the Hero */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        {/* Column 1: Humanitarian Aid - Red is left for emphasis on 'Aid' */}
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-red-500 hover:shadow-xl transition-shadow duration-300 dark:bg-gray-700 dark:text-gray-100">
+                            <i className="fas fa-hand-holding-medical text-4xl text-red-600 mb-3"></i>
+                            <h4 className="font-bold text-xl text-gray-900 mb-2 dark:text-gray-100">Health & Relief</h4>
+                            <p className="text-gray-600 text-sm dark:text-gray-300">Providing essential medical and humanitarian relief to vulnerable families during crises.</p>
+                        </div>
+                        {/* Column 2: Education - Main Action Green accent */}
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-action hover:shadow-xl transition-shadow duration-300 dark:bg-gray-700 dark:text-gray-100">
+                            <i className="fas fa-book-reader text-4xl text-action-dark mb-3"></i>
+                            <h4 className="font-bold text-xl text-gray-900 mb-2 dark:text-gray-100">Education & Dawah</h4>
+                            <p className="text-gray-600 text-sm dark:text-gray-300">Fostering knowledge and moral development through Islamic education programs.</p>
+                        </div>
+                        {/* Column 3: Community Support - Pink accent */}
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-primary-500 hover:shadow-xl transition-shadow duration-300 dark:bg-gray-700 dark:text-gray-100">
+                            <i className="fas fa-users-cog text-4xl text-primary-700 mb-3"></i>
+                            <h4 className="font-bold text-xl text-gray-900 mb-2 dark:text-gray-100">Community Development</h4>
+                            <p className="text-gray-600 text-sm dark:text-gray-300">Investing in local infrastructure and sustainable community welfare projects.</p>
+                        </div>
+                    </div>
+
+                    {/* Mission and Contact Info (Grid) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-8">
+                        {/* Left Column - Main Action Green Border */}
+                        <div className="lg:col-span-2 bg-white p-8 rounded-xl shadow-lg border-l-4 border-action dark:bg-gray-700">
+                          <h3 className="font-bold text-2xl text-action-dark flex items-center mb-4"><i className="fas fa-hands-helping mr-3"></i> Why Donate to {org.name}?</h3>
+                          <p className="text-gray-600 text-base mb-4 leading-relaxed bengali dark:text-gray-300">আমাদের লক্ষ্য দরিদ্র ও অসহায় মানুষের পাশে দাঁড়ানো, ধর্মীয় শিক্ষা ছড়ানো এবং সমাজকল্যাণমূলক কার্যক্রম পরিচালনা করা। আপনার অনুদান সরাসরি আমাদের মানবিক কাজকে এগিয়ে নেবে এবং সমাজে ইতিবাচক পরিবর্তন আনবে।</p>
+                            <h4 className="font-semibold text-lg text-primary-700 mt-5 dark:text-primary-500">Key Pillars of Support:</h4>
+                          <ul className="mt-2 text-gray-700 space-y-2 list-none dark:text-gray-200">
+                            <li><i className="fas fa-check-circle text-action mr-2"></i> **Humanitarian Aid:** Regular food, relief, and medical distribution.</li>
+                            <li><i className="fas fa-check-circle text-action mr-2"></i> **Education & Dawah:** Promoting Islamic knowledge and moral values.</li>
+                            <li><i className="fas fa-check-circle text-action mr-2"></i> **Community Development:** Local infrastructure and social welfare projects.</li>
+                          </ul>
+                      </div>
+
+                        {/* Right Column - Cream Background (primary-50) and Pink Border */}
+                        <div className="bg-primary-50 p-8 rounded-xl shadow-lg border-l-4 border-primary-500 dark:bg-gray-800">
+                          <h3 className="font-bold text-2xl text-primary-900 flex items-center mb-4 dark:text-gray-100"><i className="fas fa-map-marker-alt mr-3"></i> Contact Us</h3>
+                          <p className="text-gray-700 mb-2 dark:text-gray-300"><strong className="w-20 inline-block text-primary-700 dark:text-primary-500">Address:</strong> লাকেশ্বর বাজার, [উপজেলা/জেলা]</p>
+                          <p className="text-gray-700 mb-2 dark:text-gray-300"><strong className="w-20 inline-block text-primary-700 dark:text-primary-500">Phone:</strong> [যোগাযোগ নম্বর]</p>
+                          <p className="text-gray-700 mb-4 dark:text-gray-300"><strong className="w-20 inline-block text-primary-700 dark:text-primary-500">Email:</strong> [ইমেইল ঠিকানা]</p>
+                            
+                            <div className="mt-4 pt-4 border-t border-primary-200 dark:border-gray-700">
+                                <h4 className="font-semibold text-lg text-primary-700 dark:text-primary-500">New Donor?</h4>
+                                {/* Button - Pink BG */}
+                                <button onClick={() => { setView('account'); setIsLoginMode(false); }} className="mt-3 w-full px-5 py-2 bg-primary-700 text-white rounded-full font-medium hover:bg-primary-900 transition-colors duration-200">
+                                    <i className="fas fa-user-plus mr-2"></i> Create Donor Account
+                                </button>
+                            </div>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {/* DONATE VIEW (Updated colors) */}
+                {view === 'donate' && (
+                  <section className="bg-white p-8 rounded-xl shadow-2xl dark:bg-gray-700">
+                    <h2 className="text-2xl font-bold mb-6 border-b pb-2 text-primary-900 dark:text-gray-100 dark:border-gray-600"><i className="fas fa-donate mr-2"></i> Make Your Donation</h2>
+                    <form onSubmit={handleDonate} className="space-y-6">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Select Amount (BDT)</label>
+                        <div className="flex flex-wrap gap-3 mt-2">
+                          {[100, 300, 500, 1000, 5000].map(a => (
+                            <button type="button" key={a} onClick={() => { setAmountPreset(a); setCustomAmount(""); }} className={`px-5 py-3 rounded-lg border-2 font-medium transition-colors duration-200 shadow-sm 
+                              ${amountPreset===a && !customAmount 
+                                ? 'bg-action text-primary-900 border-action hover:bg-action-dark hover:text-white dark:text-gray-900' 
+                                : 'bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100 dark:hover:bg-gray-500'}`}>
+                              {a} BDT
+                            </button>
+                          ))}
+                          <input type="number" step="1" placeholder="Custom amount" value={customAmount} onChange={e => setCustomAmount(e.target.value)} onFocus={() => setAmountPreset(0)} className="flex-1 min-w-[150px] px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-action focus:border-action transition-shadow dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Donor Name</label>
+                          <input disabled={anonymous} value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action disabled:bg-gray-50 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100 dark:disabled:bg-gray-700" placeholder="আপনার নাম (Required)" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Phone</label>
+                          <input disabled={anonymous} value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action disabled:bg-gray-50 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100 dark:disabled:bg-gray-700" placeholder="০১XXXXXXXXX (Required)" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Email (Optional)</label>
+                          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" placeholder="আপনার ই-মেইল" />
+                        </div>
+                        <div className="flex items-center pt-4 md:pt-0">
+                          <input id="anon" type="checkbox" checked={anonymous} onChange={e => setAnonymous(e.target.checked)} className="h-4 w-4 text-action border-gray-300 rounded focus:ring-action dark:bg-gray-600 dark:border-gray-500 dark:checked:bg-action dark:ring-offset-gray-700" />
+                          <label htmlFor="anon" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Donate Anonymously</label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Note (Optional)</label>
+                        <textarea value={note} onChange={e => setNote(e.target.value)} rows="3" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" placeholder="আপনার বার্তা (ঐচ্ছিক)"></textarea>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t dark:border-gray-600">
+                        <div className="text-lg font-bold text-gray-800 dark:text-gray-100">Total Donation: <span className="text-action-dark dark:text-action-light">{selectedAmount().toLocaleString()} BDT</span></div>
+                        <div className="flex gap-3">
+                          {/* Button - New Green BG, Deep Pink Text */}
+                          <button disabled={processing} type="submit" className="px-6 py-3 bg-action text-primary-900 rounded-full font-semibold hover:bg-action-dark hover:text-white disabled:bg-action/70 transition-colors duration-200 shadow-lg dark:text-gray-900">
+                            {processing ? 'Processing...' : 'Complete Donation'}
+                          </button>
+                          <button type="button" onClick={() => { setView('home'); }} className="px-6 py-3 border border-gray-300 rounded-full text-gray-600 hover:bg-gray-100 font-medium dark:border-gray-500 dark:text-gray-300 dark:hover:bg-gray-600">Cancel</button>
+                        </div>
+                      </div>
+                    </form>
+                  </section>
+                )}
+
+                {/* ACCOUNT VIEW (Registration/Login/Profile) */}
+                {view === 'account' && (
+                    <section className="bg-white p-8 rounded-xl shadow-2xl max-w-lg mx-auto dark:bg-gray-700">
+                        
+                        {/* 1. Logged In Profile View */}
+                        {isLoggedIn ? (
+                            <div className="text-center p-6 bg-action-light border-l-4 border-action rounded-xl dark:bg-action-dark/50">
+                                <h2 className="text-3xl font-bold text-primary-900 mb-4 dark:text-gray-100"><i className="fas fa-user-check mr-2"></i> Welcome Back, {demoUser?.name}!</h2>
+                                <p className="text-gray-700 dark:text-gray-200">This is your donor profile area. (In a real application, you would see donation history here.)</p>
+                                
+                                <div className="mt-6 p-4 border border-action/50 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600">
+                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Account Details:</p>
+                                    <p className="font-medium text-gray-900 dark:text-gray-100">{demoUser?.email}</p>
+                                </div>
+                                
+                                <button onClick={handleLogout} className="mt-6 px-6 py-3 bg-primary-700 text-white rounded-full font-semibold hover:bg-primary-900 transition-colors duration-200 shadow-md">
+                                    <i className="fas fa-sign-out-alt mr-2"></i> Logout
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                <div className="flex justify-center mb-6">
+                                    <button 
+                                        onClick={() => setIsLoginMode(false)}
+                                        className={`px-6 py-2 rounded-l-full font-semibold transition-colors duration-200 ${!isLoginMode ? 'bg-action text-primary-900 dark:bg-action dark:text-gray-900' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300'}`}
+                                    >
+                                        <i className="fas fa-user-plus mr-2"></i> Register
+                                    </button>
+                                    <button 
+                                        onClick={() => setIsLoginMode(true)}
+                                        className={`px-6 py-2 rounded-r-full font-semibold transition-colors duration-200 ${isLoginMode ? 'bg-action text-primary-900 dark:bg-action dark:text-gray-900' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300'}`}
+                                    >
+                                        <i className="fas fa-sign-in-alt mr-2"></i> Login
+                                    </button>
+                                </div>
+
+                                {/* Registration Form (isLoginMode = false) */}
+                                {!isLoginMode && (
+                                    <>
+                                        <h2 className="text-2xl font-bold text-primary-900 border-b pb-2 dark:text-gray-100 dark:border-gray-600">Create Your Donor Account</h2>
+                                        <form onSubmit={handleRegister} className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Full Name</label>
+                                                <input type="text" value={regName} onChange={e => setRegName(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" placeholder="Enter your full name" required />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Email Address</label>
+                                                <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" placeholder="Your email (for login)" required />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Password</label>
+                                                <input type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" placeholder="Minimum 6 characters" required />
+                                            </div>
+                                            <div className="flex justify-between items-center pt-2">
+                                                <button disabled={processing} type="submit" className="px-6 py-3 bg-primary-700 text-white rounded-full font-semibold hover:bg-primary-900 disabled:bg-primary-400 transition-colors duration-200 shadow-md">
+                                                    {processing ? 'Creating Account...' : 'Register Now'}
+                                                </button>
+                                                <button type="button" onClick={() => setView('home')} className="px-6 py-3 border border-gray-300 rounded-full text-gray-600 hover:bg-gray-100 font-medium dark:border-gray-500 dark:text-gray-300 dark:hover:bg-gray-600">Cancel</button>
+                                            </div>
+                                        </form>
+                                    </>
+                                )}
+
+                                {/* Login Form (isLoginMode = true) */}
+                                {isLoginMode && (
+                                    <>
+                                        <h2 className="text-2xl font-bold text-primary-900 border-b pb-2 dark:text-gray-100 dark:border-gray-600">Donor Account Login</h2>
+                                        
+                                        {regSuccess && (
+                                            <div className="p-3 bg-action-light border-l-4 border-action rounded-lg dark:bg-action-dark/50">
+                                                <p className="text-sm font-semibold text-primary-900 dark:text-gray-100">
+                                                    <i className="fas fa-check-circle mr-2 text-action-dark dark:text-action"></i> Registration complete! Please log in below.
+                                                </p>
+                                            </div>
+                                        )}
+                                        
+                                        <form onSubmit={handleLogin} className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Email Address</label>
+                                                <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" placeholder="Your registered email" required />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2 dark:text-gray-300">Password</label>
+                                                <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" placeholder="Your password" required />
+                                            </div>
+                                            <div className="flex justify-between items-center pt-2">
+                                                <button disabled={processing} type="submit" className="px-6 py-3 bg-primary-700 text-white rounded-full font-semibold hover:bg-primary-900 disabled:bg-primary-400 transition-colors duration-200 shadow-md">
+                                                    {processing ? 'Logging In...' : 'Login'}
+                                                </button>
+                                                <button type="button" onClick={() => setView('home')} className="px-6 py-3 border border-gray-300 rounded-full text-gray-600 hover:bg-gray-100 font-medium dark:border-gray-500 dark:text-gray-300 dark:hover:bg-gray-600">Cancel</button>
+                                            </div>
+                                        </form>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                {/* RECEIPT VIEW (Updated colors) */}
+                {view === 'receipt' && success && (
+                  <section className="bg-white p-8 rounded-xl shadow-2xl dark:bg-gray-700">
+                    <div className="receipt-container" ref={receiptRef}>
+                      <div className="text-center pb-4 border-b border-dashed mb-4 dark:border-gray-600">
+                        <h2 className="text-2xl font-bold text-primary-900 dark:text-gray-100">Donation Successful!</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{org.name} — {org.location}</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-y-2 text-base">
+                        <p><strong><i className="fas fa-calendar-alt mr-2"></i>Date:</strong></p>
+                        <p className="text-right">{new Date(success.date).toLocaleString()}</p>
+
+                        <p><strong><i className="fas fa-receipt mr-2"></i>Receipt ID:</strong></p>
+                        <p className="text-right font-mono text-sm">{success.id}</p>
+
+                        <p><strong><i className="fas fa-user-circle mr-2"></i>Donor:</strong></p>
+                        <p className="text-right">{success.name}</p>
+
+                        <p><strong><i className="fas fa-check-circle mr-2"></i>Status:</strong></p>
+                        <p className="text-right text-action-dark font-semibold dark:text-action-light">{success.status}</p>
+                      </div>
+
+                      <div className="mt-6 p-4 bg-action-light rounded-lg dark:bg-action-dark/50">
+                        <p className="text-xl font-bold text-primary-900 flex justify-between items-center dark:text-gray-100">
+                          <i className="fas fa-hand-holding-usd mr-2"></i> Amount: 
+                          <span className="text-3xl">{success.amount.toLocaleString()} BDT</span>
+                        </p>
+                      </div>
+                      
+                      {success.note && (
+                        <div className="mt-4 p-3 border-l-4 border-gray-400 bg-gray-50 rounded dark:bg-gray-800 dark:border-gray-500">
+                          <p className="text-sm text-gray-700 italic dark:text-gray-300">Note: {success.note}</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-8 flex gap-3 no-print justify-center">
+                      {/* Button - Pink BG */}
+                      <button onClick={printReceipt} className="px-6 py-3 bg-primary-700 text-white rounded-full font-semibold hover:bg-primary-900 transition-colors duration-200 shadow-md">
+                        <i className="fas fa-print mr-2"></i> Print / Save as PDF
+                      </button>
+                      <button onClick={() => { setView('home'); setSuccess(null); }} className="px-6 py-3 border border-gray-300 rounded-full text-gray-600 hover:bg-gray-100 font-medium dark:border-gray-500 dark:text-gray-300 dark:hover:bg-gray-600">
+                        <i className="fas fa-times-circle mr-2"></i> Done
+                      </button>
+                    </div>
+                  </section>
+                )}
+
+                {/* ABOUT VIEW */}
+                {view === 'about' && (
+                  <section className="bg-white p-8 rounded-xl shadow-2xl dark:bg-gray-700">
+                    <h2 className="text-2xl font-bold text-primary-900 mb-4 border-b pb-2 dark:text-gray-100 dark:border-gray-600"><i className="fas fa-users mr-2"></i> Our Mission</h2>
+                    <p className="mt-2 text-gray-700 leading-relaxed dark:text-gray-300">{org.name} is dedicated to the welfare of the local community, engaging in various aid and religious activities. We stand by the poor and helpless through the dedicated service of our volunteer members.</p>
+                    <h3 className="text-xl font-semibold mt-6 mb-3 text-primary-700 dark:text-primary-500">Key Activities</h3>
+                    <ul className="list-none space-y-2 text-gray-600 dark:text-gray-200">
+                      <li><i className="fas fa-angle-right text-action mr-2"></i> Relief and Food Distribution</li>
+                      <li><i className="fas fa-angle-right text-action mr-2"></i> Medical Aid and Support</li>
+                      <li><i className="fas fa-angle-right text-action mr-2"></i> Islamic Education and Dawah Programs</li>
+                    </ul>
+                  </section>
+                )}
+
+                {/* ADMIN LOGIN VIEW */}
+                {view === 'admin-login' && (
+                  <section className="bg-white p-8 rounded-xl shadow-2xl max-w-md mx-auto dark:bg-gray-700">
+                    <h2 className="text-2xl font-bold text-primary-900 mb-4 dark:text-gray-100"><i className="fas fa-lock mr-2"></i> Admin Portal Login</h2>
+                    <form onSubmit={handleAdminLogin} className="mt-4 space-y-4">
+                      <input type="password" placeholder="Enter Password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-action focus:border-action dark:bg-gray-600 dark:border-gray-500 dark:text-gray-100" />
+                      <div className="flex gap-3">
+                        {/* Button - Pink BG */}
+                        <button type="submit" className="flex-1 px-6 py-3 bg-primary-700 text-white rounded-full font-semibold hover:bg-primary-900 transition-colors duration-200">Login</button>
+                        <button type="button" onClick={() => setView('home')} className="flex-1 px-6 py-3 border border-gray-300 rounded-full text-gray-600 hover:bg-gray-100 font-medium dark:border-gray-500 dark:text-gray-300 dark:hover:bg-gray-600">Cancel</button>
+                      </div>
+                    </form>
+                    <p className="mt-4 text-sm text-gray-500 text-center dark:text-gray-400">(Demo password: <strong>admin123</strong>)</p>
+                  </section>
+                )}
+
+                {/* ADMIN DASHBOARD VIEW */}
+                {view === 'admin' && adminAuth && (
+                  <section className="bg-white p-8 rounded-xl shadow-2xl dark:bg-gray-700">
+                    <div className="flex items-center justify-between no-print mb-6 border-b pb-3 dark:border-gray-600">
+                      <h2 className="text-2xl font-bold text-primary-900 dark:text-gray-100"><i className="fas fa-chart-line mr-2"></i> Admin Dashboard</h2>
+                      <div className="flex gap-3">
+                        {/* Button - Main Action Green Border, Deep Pink Text */}
+                        <button onClick={exportCSV} className="px-5 py-2 border border-action text-primary-900 rounded-full hover:bg-action-light font-medium transition-colors dark:text-gray-900 dark:bg-action/90"><i className="fas fa-file-csv mr-2"></i> Export CSV</button>
+                        <button onClick={() => { setAdminAuth(false); setView('home'); }} className="px-5 py-2 border border-primary-500 text-primary-700 rounded-full hover:bg-primary-100 font-medium transition-colors dark:border-primary-700 dark:text-primary-500 dark:hover:bg-gray-800"><i className="fas fa-sign-out-alt mr-2"></i> Logout</button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 shadow-inner dark:border-gray-600">
+                      <table className="w-full text-sm divide-y divide-gray-200 dark:divide-gray-600">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
+                          <tr className="text-left text-gray-600 uppercase tracking-wider dark:text-gray-300">
+                            <th className="p-3">ID</th>
+                            <th className="p-3">Donor</th>
+                            <th className="p-3">Phone</th>
+                            <th className="p-3">Amount</th>
+                            <th className="p-3">Date</th>
+                            <th className="p-3">Note</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100 dark:bg-gray-700 dark:divide-gray-600">
+                          {donations.length === 0 && (
+                            <tr><td colSpan={6} className="p-4 text-center text-gray-500 italic dark:text-gray-400">No donations have been recorded yet.</td></tr>
+                          )}
+                          {donations.map(d => (
+                            <tr key={d.id} className="hover:bg-gray-50 transition-colors dark:hover:bg-gray-600">
+                              <td className="p-3 font-mono text-xs text-gray-500 dark:text-gray-400">{d.id}</td>
+                              <td className="p-3 font-medium dark:text-gray-100">{d.name}</td>
+                              <td className="p-3 dark:text-gray-300">{d.phone}</td>
+                              <td className="p-3 font-bold text-action-dark dark:text-action-light">{d.amount.toLocaleString()} BDT</td>
+                              <td className="p-3 text-gray-500 dark:text-gray-400">{new Date(d.date).toLocaleDateString()}</td>
+                              <td className="p-3 max-w-xs truncate dark:text-gray-300">{d.note || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
+
+              </main>
+
+              {/* FOOTER - Deep Pink BG, added Dark Mode color */}
+              <footer className="mt-12 py-6 bg-primary-900 no-print dark:bg-gray-800 transition-colors duration-500">
+                <div className="max-w-6xl mx-auto px-4 text-center text-sm text-primary-200 dark:text-gray-400">
+                  © {new Date().getFullYear()} {org.name} — All Rights Reserved.
+                </div>
+                </footer>
+            </div>
+          );
+        }
+        
+        // 3. Render the component to the page
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DonationApp />);
+    </script>
+</body>
+</html>
